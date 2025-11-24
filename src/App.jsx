@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import AIChat from './pages/AIChat';
-import Plans from './pages/Plans';
+import DietPlan from './pages/DietPlan';
+import WorkoutPlan from './pages/WorkoutPlan';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -13,8 +14,10 @@ function App() {
         return <Dashboard />;
       case 'chat':
         return <AIChat />;
-      case 'plans':
-        return <Plans />;
+      case 'diet':
+        return <DietPlan />;
+      case 'workout':
+        return <WorkoutPlan />;
       case 'settings':
         return (
           <div className="p-8 text-center text-gray-500">

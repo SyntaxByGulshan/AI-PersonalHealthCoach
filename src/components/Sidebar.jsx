@@ -4,12 +4,13 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
     const menuItems = [
         { id: 'dashboard', label: 'Dashboard', icon: '📊' },
         { id: 'chat', label: 'AI Coach', icon: '🤖' },
-        { id: 'plans', label: 'Plans', icon: '📝' },
+        { id: 'diet', label: 'Diet Plan', icon: '🍽️' },
+        { id: 'workout', label: 'Workout', icon: '💪' },
         { id: 'settings', label: 'Settings', icon: '⚙️' },
     ];
 
     return (
-        <div className="w-64 h-screen bg-darker border-r border-white/10 flex flex-col p-6 fixed left-0 top-0">
+        <div className="w-64 h-screen bg-darker border-r border-white/10 flex flex-col p-6 fixed left-0 top-0 z-50">
             <h1 className="text-2xl font-bold text-primary mb-10">AI Health</h1>
             <nav className="flex-1 space-y-4">
                 {menuItems.map((item) => (
@@ -17,8 +18,8 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
                         key={item.id}
                         onClick={() => setActiveTab(item.id)}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.id
-                                ? 'bg-primary/20 text-primary border border-primary/20'
-                                : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                            ? 'bg-primary/20 text-primary border border-primary/20'
+                            : 'text-gray-400 hover:bg-white/5 hover:text-white'
                             }`}
                     >
                         <span className="text-xl">{item.icon}</span>

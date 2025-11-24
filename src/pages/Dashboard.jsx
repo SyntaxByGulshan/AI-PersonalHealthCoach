@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { stepCounter } from '../services/stepCounter';
 
 const StatCard = ({ title, value, unit, icon, color }) => (
     <div className="glass-card p-6 flex flex-col justify-between h-40 relative overflow-hidden group hover:bg-white/10 transition-all">
@@ -16,19 +17,118 @@ const StatCard = ({ title, value, unit, icon, color }) => (
 );
 
 const Dashboard = () => {
+    const [showNotification, setShowNotification] = useState(false);
+    const [steps, setSteps] = useState(0);
+    const [isTracking, setIsTracking] = useState(false);
+    const [trackingError, setTrackingError] = useState(null);
+
+    useEffect(() => {
+        // Load saved steps from localStorage
+        const savedSteps = localStorage.getItem('dailySteps');
+        if (savedSteps) {
+            const parsed = parseInt(savedSteps);
+            setSteps(parsed);
+            stepCounter.setSteps(parsed);
+        }
+
+        return () => {
+            stepCounter.stop();
+        };
+    }, []);
+
+    const handleStartTracking = async () => {
+        const success = await stepCounter.start((newSteps) => {
+            setSteps(newSteps);
+            localStorage.setItem('dailySteps', newSteps.toString());
+        });
+
+        if (success) {
+            setIsTracking(true);
+            setTrackingError(null);
+        } else {
+            setTrackingError('Unable to access device motion sensors. This feature requires a mobile device with motion sensors and HTTPS.');
+        }
+    };
+
+    const handleStopTracking = () => {
+        stepCounter.stop();
+        setIsTracking(false);
+    };
+
+    const handleResetSteps = () => {
+        stepCounter.reset();
+        setSteps(0);
+        localStorage.setItem('dailySteps', '0');
+    };
+
+    const handleCheckIn = () => {
+        setShowNotification(true);
+        setTimeout(() => setShowNotification(false), 3000);
+    };
+
+    const calories = Math.round(steps * 0.04); // Rough estimate: 0.04 calories per step
+
     return (
-        <div className="p-8 space-y-8">
+        <div className="p-8 space-y-8 relative">
+            {showNotification && (
+                <div className="fixed top-8 right-8 z-50 bg-secondary text-darker px-6 py-4 rounded-xl font-bold shadow-2xl animate-bounce">
+                    ✅ Daily Check-in completed!<br />
+                    <span className="text-sm">+500 Steps | +100 Calories</span>
+                </div>
+            )}
+
             <header className="flex justify-between items-center">
                 <div>
                     <h2 className="text-3xl font-bold text-white">Welcome back, User! 👋</h2>
                     <p className="text-gray-400 mt-1">Here's your daily health overview.</p>
                 </div>
-                <button className="btn-primary">Daily Check-in</button>
+                <div className="flex gap-2">
+                    {!isTracking ? (
+                        <button
+                            onClick={handleStartTracking}
+                            className="bg-secondary text-darker font-bold py-2 px-4 rounded-lg hover:bg-opacity-80 transition-all"
+                        >
+                            🚶 Start Tracking
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleStopTracking}
+                            className="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-opacity-80 transition-all"
+                        >
+                            ⏸️ Stop Tracking
+                        </button>
+                    )}
+                    <button
+                        onClick={handleCheckIn}
+                        className="btn-primary cursor-pointer"
+                    >
+                        Daily Check-in
+                    </button>
+                </div>
             </header>
 
+            {trackingError && (
+                <div className="glass-card p-4 border-l-4 border-yellow-500">
+                    <p className="text-yellow-500 text-sm">⚠️ {trackingError}</p>
+                    <p className="text-gray-400 text-xs mt-2">Note: Step tracking works best on mobile devices. Make sure you're using HTTPS and grant motion permissions when prompted.</p>
+                </div>
+            )}
+
+            {isTracking && (
+                <div className="glass-card p-4 border-l-4 border-secondary">
+                    <p className="text-secondary text-sm">✅ Step tracking is active! Walk around with your device to count steps.</p>
+                    <button
+                        onClick={handleResetSteps}
+                        className="text-xs text-gray-400 hover:text-white mt-2 underline"
+                    >
+                        Reset step count
+                    </button>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard title="Steps" value="8,432" unit="/ 10k" icon="👣" color="primary" />
-                <StatCard title="Calories" value="1,850" unit="kcal" icon="🔥" color="orange-500" />
+                <StatCard title="Steps" value={steps.toLocaleString()} unit="/ 10k" icon="👣" color="primary" />
+                <StatCard title="Calories" value={calories.toLocaleString()} unit="kcal" icon="🔥" color="orange-500" />
                 <StatCard title="Water" value="1.2" unit="L" icon="💧" color="blue-500" />
                 <StatCard title="Sleep" value="7h 20m" unit="" icon="😴" color="purple-500" />
             </div>

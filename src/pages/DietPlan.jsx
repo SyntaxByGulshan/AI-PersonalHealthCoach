@@ -11,7 +11,7 @@ const DietPlan = () => {
     const [points, setPoints] = useState(0);
     const [currentDate] = useState(new Date());
     const [isLoaded, setIsLoaded] = useState(false);
-    const [isGenerating, setIsGenerating] = useState(false);
+
 
     useEffect(() => {
         // Check for new week and load plan
@@ -109,25 +109,7 @@ const DietPlan = () => {
         return totalCalories;
     };
 
-    const handleGenerateNewPlan = async () => {
-        if (!confirm('Generate a new AI-powered weekly diet plan? This will replace your current plan.')) {
-            return;
-        }
 
-        setIsGenerating(true);
-        try {
-            const result = await weeklyPlanService.generateNewPlan();
-            if (result.success) {
-                alert('✨ AI-generated weekly diet plan loaded successfully!');
-            } else {
-                alert('⚠️ AI generation unavailable. Using our expertly-crafted default plan instead!');
-            }
-        } catch (error) {
-            alert('Using default plan. To enable AI features, add your Gemini API key.');
-        } finally {
-            setIsGenerating(false);
-        }
-    };
 
     const progress = calculateProgress();
     const caloriesConsumed = calculateDailyCalories();
@@ -145,21 +127,7 @@ const DietPlan = () => {
                     </h2>
                     <p className="text-gray-400">Track your meals for {todayName}, {currentDate.toDateString()}</p>
                 </div>
-                <button
-                    onClick={handleGenerateNewPlan}
-                    disabled={isGenerating}
-                    className="btn-primary flex items-center gap-2"
-                >
-                    {isGenerating ? (
-                        <>
-                            <Loader className="w-5 h-5 animate-spin" /> Generating...
-                        </>
-                    ) : (
-                        <>
-                            <Sparkles className="w-5 h-5" /> Generate AI Plan
-                        </>
-                    )}
-                </button>
+
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">

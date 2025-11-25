@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, CheckSquare, Bot, Utensils, Dumbbell, User, Menu, X } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, Bot, Utensils, Dumbbell, User, Menu, X, TrendingUp } from 'lucide-react';
 import { profileService } from '../services/profileService';
 import logo from '../assets/logo.png';
 
@@ -18,6 +18,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
         { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={24} /> },
         { id: 'profile', label: 'Profile', icon: <User size={24} /> },
         { id: 'habits', label: 'Daily Habits', icon: <CheckSquare size={24} /> },
+        { id: 'progress', label: 'Progress', icon: <TrendingUp size={24} /> },
         { id: 'chat', label: 'AI Coach', icon: <Bot size={24} /> },
         { id: 'diet', label: 'Diet Plan', icon: <Utensils size={24} /> },
         { id: 'workout', label: 'Workout', icon: <Dumbbell size={24} /> },

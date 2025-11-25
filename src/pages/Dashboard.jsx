@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import { stepCounter } from '../services/stepCounter';
-import { profileService } from '../services/profileService';
-import { Footprints, Flame, Droplets, Moon, Play, Pause, AlertTriangle, CheckCircle, Utensils, Award } from 'lucide-react';
+import { startTracking, stopTracking, updateSteps, resetSteps } from '../store/slices/stepsSlice';
+import { trackStepsGoalAchieved } from '../store/slices/progressSlice';
+import { calculateBMI, calculateRecommendedCalories } from '../store/slices/userSlice';
+import { Footprints, Flame, Utensils, Award, TrendingUp, Play, Pause, AlertTriangle, CheckCircle } from 'lucide-react';
 
 const StatCard = ({ title, value, unit, icon, color }) => (
     <div className="glass-card p-4 md:p-6 flex flex-col justify-between h-32 md:h-40 relative overflow-hidden group hover:bg-white/10 transition-all">
@@ -19,39 +22,43 @@ const StatCard = ({ title, value, unit, icon, color }) => (
 );
 
 const Dashboard = () => {
+    const dispatch = useDispatch();
+
+    // Get state from Redux
+    const profile = useSelector(state => state.user);
+    const stepsState = useSelector(state => state.steps);
+    const progressState = useSelector(state => state.progress);
+
     const [showNotification, setShowNotification] = useState(false);
-    const [steps, setSteps] = useState(0);
-    const [dietData, setDietData] = useState({ points: 0, totalCalories: 0, mealsCompleted: 0, totalMeals: 0 });
-    const [isTracking, setIsTracking] = useState(false);
     const [trackingError, setTrackingError] = useState(null);
-    const [profile, setProfile] = useState(profileService.loadProfile());
+
+    // Get today's date key
+    const getTodayKey = () => new Date().toISOString().split('T')[0];
+    const today = getTodayKey();
+
+    // Get today's points or default
+    const todayPoints = progressState.dailyPoints[today] || { diet: 0, workout: 0, habits: 0, steps: 0, total: 0 };
 
     useEffect(() => {
-        const savedSteps = localStorage.getItem('dailySteps');
-        if (savedSteps) {
-            const parsed = parseInt(savedSteps);
-            setSteps(parsed);
-            stepCounter.setSteps(parsed);
-        }
-
-        const savedDiet = localStorage.getItem('dietProgress');
-        if (savedDiet) {
-            setDietData(JSON.parse(savedDiet));
-        }
-
         return () => {
             stepCounter.stop();
         };
     }, []);
 
+    // Check if step goal is achieved and award points
+    useEffect(() => {
+        if (stepsState.steps >= stepsState.goal && todayPoints.steps === 0) {
+            dispatch(trackStepsGoalAchieved({ achieved: true }));
+        }
+    }, [stepsState.steps, stepsState.goal, todayPoints.steps, dispatch]);
+
     const handleStartTracking = async () => {
         const success = await stepCounter.start((newSteps) => {
-            setSteps(newSteps);
-            localStorage.setItem('dailySteps', newSteps.toString());
+            dispatch(updateSteps(newSteps));
         });
 
         if (success) {
-            setIsTracking(true);
+            dispatch(startTracking());
             setTrackingError(null);
         } else {
             setTrackingError('Unable to access device motion sensors. This feature requires a mobile device with motion sensors and HTTPS.');
@@ -60,13 +67,12 @@ const Dashboard = () => {
 
     const handleStopTracking = () => {
         stepCounter.stop();
-        setIsTracking(false);
+        dispatch(stopTracking());
     };
 
     const handleResetSteps = () => {
         stepCounter.reset();
-        setSteps(0);
-        localStorage.setItem('dailySteps', '0');
+        dispatch(resetSteps());
     };
 
     const handleCheckIn = () => {
@@ -74,11 +80,11 @@ const Dashboard = () => {
         setTimeout(() => setShowNotification(false), 3000);
     };
 
-    const calories = Math.round(steps * 0.04);
+    const calories = Math.round(stepsState.steps * 0.04);
     const userName = profile.name || 'User';
-    const isProfileComplete = profileService.isProfileComplete(profile);
-    const bmi = isProfileComplete ? profileService.calculateBMI(profile.weight, profile.height) : null;
-    const recommendedCalories = isProfileComplete ? profileService.calculateRecommendedCalories(profile) : null;
+    const isProfileComplete = profile.profileCompleted;
+    const bmi = isProfileComplete ? calculateBMI(profile.weight, profile.height) : null;
+    const recommendedCalories = isProfileComplete ? calculateRecommendedCalories(profile) : null;
 
     return (
         <div className="p-4 md:p-8 space-y-6 md:space-y-8 relative">
@@ -102,7 +108,7 @@ const Dashboard = () => {
                     </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2">
-                    {!isTracking ? (
+                    {!stepsState.isTracking ? (
                         <button
                             onClick={handleStartTracking}
                             className="bg-secondary text-darker font-bold py-2 px-4 rounded-lg hover:bg-opacity-80 transition-all flex items-center justify-center gap-2 text-sm md:text-base"
@@ -137,7 +143,7 @@ const Dashboard = () => {
                 </div>
             )}
 
-            {isTracking && (
+            {stepsState.isTracking && (
                 <div className="glass-card p-3 md:p-4 border-l-4 border-secondary">
                     <div className="flex items-center gap-2 text-secondary mb-1">
                         <CheckCircle className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
@@ -153,11 +159,38 @@ const Dashboard = () => {
                 </div>
             )}
 
+            {/* Points Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="glass-card p-4 border-l-4 border-primary">
+                    <div className="flex items-center gap-2 mb-2">
+                        <Award className="w-5 h-5 text-primary" />
+                        <h3 className="text-lg font-bold text-white">Today's Points</h3>
+                    </div>
+                    <div className="text-3xl font-bold text-primary mb-2">{todayPoints.total}</div>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-400">
+                        <div>Diet: +{todayPoints.diet}</div>
+                        <div>Workout: +{todayPoints.workout}</div>
+                        <div>Habits: +{todayPoints.habits}</div>
+                        <div>Steps: +{todayPoints.steps}</div>
+                    </div>
+                </div>
+                <div className="glass-card p-4 border-l-4 border-secondary">
+                    <div className="flex items-center gap-2 mb-2">
+                        <TrendingUp className="w-5 h-5 text-secondary" />
+                        <h3 className="text-lg font-bold text-white">Weekly Total</h3>
+                    </div>
+                    <div className="text-3xl font-bold text-secondary mb-2">{progressState.weeklyTotal}</div>
+                    <div className="text-xs text-gray-400">
+                        Current streak: {progressState.streaks.current} days
+                    </div>
+                </div>
+            </div>
+
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
-                <StatCard title="Steps" value={steps.toLocaleString()} unit="/ 10k" icon={<Footprints size={28} />} color="primary" />
+                <StatCard title="Steps" value={stepsState.steps.toLocaleString()} unit={`/ ${(stepsState.goal / 1000).toFixed(0)}k`} icon={<Footprints size={28} />} color="primary" />
                 <StatCard title="Calories Burned" value={calories.toLocaleString()} unit="kcal" icon={<Flame size={28} />} color="orange-500" />
-                <StatCard title="Calories Eaten" value={dietData.totalCalories} unit="kcal" icon={<Utensils size={28} />} color="green-500" />
-                <StatCard title="Diet Points" value={dietData.points} unit="pts" icon={<Award size={28} />} color="yellow-500" />
+                <StatCard title="Daily Points" value={todayPoints.total} unit="pts" icon={<Award size={28} />} color="yellow-500" />
+                <StatCard title="Weekly Points" value={progressState.weeklyTotal} unit="pts" icon={<TrendingUp size={28} />} color="purple-500" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">

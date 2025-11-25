@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
+import Profile from './pages/Profile';
 import AIChat from './pages/AIChat';
 import DietPlan from './pages/DietPlan';
 import WorkoutPlan from './pages/WorkoutPlan';
@@ -13,6 +14,8 @@ function App() {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard />;
+      case 'profile':
+        return <Profile />;
       case 'habits':
         return <DailyHabits />;
       case 'chat':
@@ -21,13 +24,6 @@ function App() {
         return <DietPlan />;
       case 'workout':
         return <WorkoutPlan />;
-      case 'settings':
-        return (
-          <div className="p-8 text-center text-gray-500">
-            <h2 className="text-2xl font-bold text-white mb-4">Settings</h2>
-            <p>Settings panel coming soon...</p>
-          </div>
-        );
       default:
         return <Dashboard />;
     }
@@ -36,7 +32,12 @@ function App() {
   return (
     <div className="flex min-h-screen bg-dark text-white font-sans">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      <main className="flex-1 ml-64 bg-darker min-h-screen">
+      <main className="flex-1 bg-darker min-h-screen 
+        ml-0
+        md:ml-24
+        lg:ml-64
+        pt-16 md:pt-0
+      ">
         {renderContent()}
       </main>
     </div>

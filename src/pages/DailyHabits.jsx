@@ -1,16 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { Droplets, Sun, Moon, Footprints, Brain, BookOpen, Sparkles, Flame, PartyPopper } from 'lucide-react';
+import { Droplets, Sun, Moon, Footprints, Brain, BookOpen, Sparkles, Flame, PartyPopper, Heart, Coffee, Salad } from 'lucide-react';
+import { weeklyPlanService } from '../services/weeklyPlanService';
 
-const DEFAULT_HABITS = [
-    { id: 'water', icon: <Droplets size={24} />, name: 'Drink 8 glasses of water', points: 15, desc: 'Stay hydrated throughout the day' },
-    { id: 'wakeup', icon: <Sun size={24} />, name: 'Wake up before 7 AM', points: 10, desc: 'Start your day early and energized' },
-    { id: 'sleep', icon: <Moon size={24} />, name: 'Sleep by 10 PM', points: 10, desc: 'Get quality rest for recovery' },
-    { id: 'steps', icon: <Footprints size={24} />, name: '10,000 steps today', points: 15, desc: 'Meet your daily step goal' },
-    { id: 'meditation', icon: <Brain size={24} />, name: '5-min meditation', points: 10, desc: 'Practice mindfulness and reduce stress' },
-    { id: 'reading', icon: <BookOpen size={24} />, name: 'Read for 20 minutes', points: 10, desc: 'Learn something new every day' },
-];
+// Icon mapping for dynamic habit icons
+const ICON_MAP = {
+    water: <Droplets size={24} />,
+    wakeup: <Sun size={24} />,
+    sleep: <Moon size={24} />,
+    steps: <Footprints size={24} />,
+    meditation: <Brain size={24} />,
+    reading: <BookOpen size={24} />,
+    mindfulness: <Brain size={24} />,
+    diet: <Salad size={24} />,
+    exercise: <Heart size={24} />,
+    coffee: <Coffee size={24} />
+};
+
+const getHabitIcon = (habitId) => {
+    return ICON_MAP[habitId] || <Sparkles size={24} />;
+};
 
 const DailyHabits = () => {
+    const [habits, setHabits] = useState([]);
     const [completedHabits, setCompletedHabits] = useState({});
     const [points, setPoints] = useState(0);
     const [streak, setStreak] = useState(0);
@@ -24,32 +35,53 @@ const DailyHabits = () => {
 
     // Load saved data from localStorage
     useEffect(() => {
-        const saved = localStorage.getItem('dailyHabitsData');
-        if (saved) {
-            const data = JSON.parse(saved);
-            const today = getTodayKey();
-
-            // Check if we need to reset for a new day
-            if (data.lastDate !== today) {
-                // New day - reset completed habits but keep points and update streak
-                const previousDayCompleted = data.completed?.[data.lastDate];
-                const allHabitsCompleted = DEFAULT_HABITS.every(h => previousDayCompleted?.[h.id]);
-
-                setCompletedHabits({ [today]: {} });
-                setPoints(data.points || 0);
-                setStreak(allHabitsCompleted ? (data.streak || 0) + 1 : 0);
-            } else {
-                // Same day - restore state
-                setCompletedHabits(data.completed || { [today]: {} });
-                setPoints(data.points || 0);
-                setStreak(data.streak || 0);
+        // Check for new week and load plan
+        const initializePlan = async () => {
+            try {
+                await weeklyPlanService.checkAndResetWeek();
+            } catch (error) {
+                console.error('Failed to check/reset week:', error);
             }
-        } else {
-            // First time - initialize
-            const today = getTodayKey();
-            setCompletedHabits({ [today]: {} });
-        }
-        setIsLoaded(true);
+
+            const plan = weeklyPlanService.getCurrentPlan();
+            setHabits(plan.habits || []);
+
+            const saved = localStorage.getItem('dailyHabitsData');
+            if (saved) {
+                const data = JSON.parse(saved);
+                const today = getTodayKey();
+
+                // Check if we need to reset for a new day
+                if (data.lastDate !== today) {
+                    // New day - reset completed habits but keep points and update streak
+                    const previousDayCompleted = data.completed?.[data.lastDate];
+                    const allHabitsCompleted = (plan.habits || []).every(h => previousDayCompleted?.[h.id]);
+
+                    setCompletedHabits({ [today]: {} });
+                    setPoints(data.points || 0);
+                    setStreak(allHabitsCompleted ? (data.streak || 0) + 1 : 0);
+                } else {
+                    // Same day - restore state
+                    setCompletedHabits(data.completed || { [today]: {} });
+                    setPoints(data.points || 0);
+                    setStreak(data.streak || 0);
+                }
+            } else {
+                // First time - initialize
+                const today = getTodayKey();
+                setCompletedHabits({ [today]: {} });
+            }
+            setIsLoaded(true);
+        };
+
+        initializePlan();
+
+        // Subscribe to plan updates
+        const unsubscribe = weeklyPlanService.subscribe((newPlan) => {
+            setHabits(newPlan.habits || []);
+        });
+
+        return unsubscribe;
     }, []);
 
     // Save data to localStorage whenever it changes
@@ -86,7 +118,7 @@ const DailyHabits = () => {
         const today = getTodayKey();
         const todayCompleted = completedHabits[today] || {};
         const completed = Object.values(todayCompleted).filter(Boolean).length;
-        const total = DEFAULT_HABITS.length;
+        const total = habits.length;
         const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
 
         return { completed, total, percent };
@@ -155,9 +187,10 @@ const DailyHabits = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {DEFAULT_HABITS.map((habit) => {
+                    {habits.map((habit) => {
                         const today = getTodayKey();
                         const isCompleted = completedHabits[today]?.[habit.id] || false;
+                        const icon = getHabitIcon(habit.id);
 
                         return (
                             <div
@@ -178,7 +211,7 @@ const DailyHabits = () => {
                                 <div className="flex-1">
                                     <div className="flex items-start justify-between mb-2">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-2xl text-primary">{habit.icon}</span>
+                                            <span className="text-2xl text-primary">{icon}</span>
                                             <h4 className={`text-lg font-bold ${isCompleted ? 'line-through text-gray-500' : 'text-white'
                                                 }`}>
                                                 {habit.name}

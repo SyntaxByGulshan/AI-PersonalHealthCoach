@@ -1,74 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { generatePlans } from '../services/gemini';
+import { weeklyPlanService } from '../services/weeklyPlanService';
 import { Dumbbell, Loader, Sparkles, ChevronDown, ChevronRight } from 'lucide-react';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-const DEFAULT_WORKOUTS = {
-    Monday: {
-        focus: 'Chest & Triceps',
-        exercises: [
-            { name: 'Push-ups', sets: '3', reps: '12-15', desc: 'Keep core tight, chest to floor' },
-            { name: 'Dumbbell Bench Press', sets: '3', reps: '10-12', desc: 'Control the weight down' },
-            { name: 'Tricep Dips', sets: '3', reps: '12-15', desc: 'Use a chair or bench' },
-            { name: 'Plank', sets: '3', reps: '45s', desc: 'Hold position, don\'t sag hips' }
-        ]
-    },
-    Tuesday: {
-        focus: 'Back & Biceps',
-        exercises: [
-            { name: 'Pull-ups (or Rows)', sets: '3', reps: '8-10', desc: 'Full range of motion' },
-            { name: 'Dumbbell Rows', sets: '3', reps: '10-12', desc: 'Keep back flat' },
-            { name: 'Bicep Curls', sets: '3', reps: '12-15', desc: 'Squeeze at the top' },
-            { name: 'Superman', sets: '3', reps: '15', desc: 'Lift arms and legs simultaneously' }
-        ]
-    },
-    Wednesday: {
-        focus: 'Active Recovery',
-        exercises: [
-            { name: 'Light Jog/Walk', sets: '1', reps: '30m', desc: 'Keep heart rate moderate' },
-            { name: 'Stretching Routine', sets: '1', reps: '15m', desc: 'Focus on tight areas' },
-            { name: 'Yoga Flow', sets: '1', reps: '20m', desc: 'Basic sun salutations' }
-        ]
-    },
-    Thursday: {
-        focus: 'Legs & Shoulders',
-        exercises: [
-            { name: 'Squats', sets: '4', reps: '12-15', desc: 'Knees behind toes' },
-            { name: 'Lunges', sets: '3', reps: '10/leg', desc: 'Keep torso upright' },
-            { name: 'Shoulder Press', sets: '3', reps: '10-12', desc: 'Press straight up' },
-            { name: 'Calf Raises', sets: '3', reps: '20', desc: 'Full extension' }
-        ]
-    },
-    Friday: {
-        focus: 'Full Body HIIT',
-        exercises: [
-            { name: 'Burpees', sets: '3', reps: '15', desc: 'Explosive movement' },
-            { name: 'Mountain Climbers', sets: '3', reps: '40s', desc: 'Keep hips low' },
-            { name: 'Jump Squats', sets: '3', reps: '15', desc: 'Soft landing' },
-            { name: 'Russian Twists', sets: '3', reps: '20/side', desc: 'Feet off ground if possible' }
-        ]
-    },
-    Saturday: {
-        focus: 'Cardio & Core',
-        exercises: [
-            { name: 'Running/Cycling', sets: '1', reps: '45m', desc: 'Steady state cardio' },
-            { name: 'Crunches', sets: '3', reps: '20', desc: 'Engage core' },
-            { name: 'Leg Raises', sets: '3', reps: '15', desc: 'Control the descent' },
-            { name: 'Bicycle Crunches', sets: '3', reps: '20/side', desc: 'Elbow to opposite knee' }
-        ]
-    },
-    Sunday: {
-        focus: 'Rest Day',
-        exercises: [
-            { name: 'Rest', sets: '1', reps: '0', desc: 'Take a break, you earned it!' },
-            { name: 'Light Walk', sets: '1', reps: '20m', desc: 'Optional active recovery' }
-        ]
-    }
-};
-
 const WorkoutPlan = () => {
-    const [workouts, setWorkouts] = useState(DEFAULT_WORKOUTS);
+    const [workouts, setWorkouts] = useState({});
     const [isLoading, setIsLoading] = useState(false);
     const [completedExercises, setCompletedExercises] = useState({});
     const [points, setPoints] = useState(0);
@@ -76,13 +13,34 @@ const WorkoutPlan = () => {
     const [isLoaded, setIsLoaded] = useState(false);
 
     useEffect(() => {
-        const saved = localStorage.getItem('weeklyWorkoutCompletion');
-        if (saved) {
-            const data = JSON.parse(saved);
-            setCompletedExercises(data.completed || {});
-            setPoints(data.points || 0);
-        }
-        setIsLoaded(true);
+        // Check for new week and load plan
+        const initializePlan = async () => {
+            try {
+                await weeklyPlanService.checkAndResetWeek();
+            } catch (error) {
+                console.error('Failed to check/reset week:', error);
+            }
+
+            const plan = weeklyPlanService.getCurrentPlan();
+            setWorkouts(plan.workout || {});
+
+            const saved = localStorage.getItem('weeklyWorkoutCompletion');
+            if (saved) {
+                const data = JSON.parse(saved);
+                setCompletedExercises(data.completed || {});
+                setPoints(data.points || 0);
+            }
+            setIsLoaded(true);
+        };
+
+        initializePlan();
+
+        // Subscribe to plan updates
+        const unsubscribe = weeklyPlanService.subscribe((newPlan) => {
+            setWorkouts(newPlan.workout || {});
+        });
+
+        return unsubscribe;
     }, []);
 
     useEffect(() => {
@@ -95,23 +53,21 @@ const WorkoutPlan = () => {
     }, [completedExercises, points, isLoaded]);
 
     const handleGeneratePlan = async () => {
+        if (!confirm('Generate a new AI-powered weekly workout plan? This will replace your current plan.')) {
+            return;
+        }
+
         setIsLoading(true);
         try {
-            // In a real app, we would pass user stats/goals here
-            const userStats = {
-                steps: 8432,
-                calories: 1850,
-                water: 1.2,
-                sleep: "7h 20m"
-            };
-            const plans = await generatePlans(userStats);
-            if (plans && plans.workout) {
-                // For now, just show success - could parse AI response to update workouts
-                alert("AI workout plan generated! (Using default plan for now)");
+            const result = await weeklyPlanService.generateNewPlan();
+            if (result.success) {
+                alert('✨ AI-generated weekly workout plan loaded successfully!');
+            } else {
+                alert('⚠️ AI generation unavailable. Using our expertly-crafted default plan instead!');
             }
         } catch (error) {
             console.error("Failed to generate plan:", error);
-            alert("Failed to generate new plan. Please check your API key or try again.");
+            alert("Using default plan. To enable AI features, add your Gemini API key.");
         } finally {
             setIsLoading(false);
         }
@@ -202,8 +158,7 @@ const WorkoutPlan = () => {
                             <div
                                 className="bg-secondary h-full transition-all duration-500"
                                 style={{ width: `${progress.percent}%` }}
-                            ></div
-                            >
+                            ></div>
                         </div>
                         <span className="text-2xl font-bold text-white">{progress.percent}%</span>
                     </div>
@@ -222,6 +177,8 @@ const WorkoutPlan = () => {
             <div className="space-y-4">
                 {DAYS.map((day) => {
                     const dayPlan = workouts[day];
+                    if (!dayPlan) return null;
+
                     const isExpanded = expandedDays[day];
                     const dayExercises = dayPlan.exercises || [];
                     const completedCount = dayExercises.filter((_, idx) => completedExercises[`${day}-${idx}`]).length;
